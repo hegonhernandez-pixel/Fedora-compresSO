@@ -2,29 +2,33 @@
 set -euo pipefail
 
 RELEASE="40"
-KS_FILE="kickstarts/fedora-gpu-live.ks"
-OUTPUT_DIR="$(pwd)/out"
+KS_FILE="/workspace/kickstarts/fedora-gpu-live.ks"
 
-mkdir -p "${OUTPUT_DIR}"
+echo "==> Iniciando construcción en contenedor..."
 
-echo "==> Iniciando construcción de Fedora GPU ISO (F${RELEASE})..."
-
-# Ejecutar livemedia-creator dentro de un contenedor Fedora oficial
+# Asegurarse de que el directorio out NO exista previamente dentro del contenedor
 podman run --privileged --rm \
   -v "$(pwd)":/workspace:Z \
-  -v "${OUTPUT_DIR}":/out:Z \
   -w /workspace \
   registry.fedoraproject.org/fedora:${RELEASE} \
   bash -c "
-    dnf install -y lorax livecd-tools dnf-plugins-core
+    set -euo pipefail
+    
+    # 1. Instalar lorax, anaconda y herramientas necesarias para --no-virt
+    dnf install -y lorax anaconda anaconda-install-env-deps livecd-tools dnf-plugins-core
+    
+    # 2. Asegurarse de que /workspace/out no exista antes de llamar a livemedia-creator
+    rm -rf /workspace/out
+    
+    # 3. Compilar la ISO
     livemedia-creator \
       --ks=${KS_FILE} \
       --no-virt \
-      --resultdir=/out \
-      --project='Fedora GPU Engine' \
+      --resultdir=/workspace/out \
+      --project='Fedora compresSO Engine' \
       --make-iso \
-      --volid='Fedora-GPU-F${RELEASE}' \
-      --iso-name='Fedora-GPU-F${RELEASE}-x86_64.iso'
+      --volid='Fedora-compresSO' \
+      --iso-name='Fedora-compresSO-x86_64.iso'
   "
 
-echo "==> ISO construida con éxito en: ${OUTPUT_DIR}/"
+echo "==> Construcción finalizada con éxito."
