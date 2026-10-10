@@ -1,9 +1,8 @@
-name: Build Fedora GPU ISO
+name: Build Fedora compresSO ISO
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -13,19 +12,18 @@ jobs:
       - name: Checkout Código
         uses: actions/checkout@v4
 
-      - name: Instalar QEMU y Podman
+      - name: Verificar archivos requeridos
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 podman
+          test -f kickstarts/fedora-gpu-live.ks || (echo "ERROR: kickstarts/fedora-gpu-live.ks no encontrado" && exit 1)
+          chmod +x scripts/build-iso.sh
 
       - name: Construir Imagen ISO
         run: |
-          chmod +x scripts/build-iso.sh
           sudo ./scripts/build-iso.sh
 
-      - name: Subir ISO como Artefacto
+      - name: Subir ISO resultante
         uses: actions/upload-artifact@v4
         with:
-          name: Fedora-GPU-ISO
+          name: Fedora-compresSO-ISO
           path: out/*.iso
           retention-days: 7
