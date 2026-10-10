@@ -20,7 +20,51 @@ mkdir -p "$BUILD_ROOT" "$ISO_DIR/LiveOS" "$ISO_DIR/isolinux" "$OUTPUT_DIR"
 echo "[+] Inicializando descarga de paquetes Fedora 40 para el RootFS..."
 dnf install --installroot="$BUILD_ROOT" --releasever=40 \
     --setopt=install_weak_deps=False -y \
-    @core kernel kernel-modules mesa-vulkan-drivers libdrm amdgpu-firmware vulkan-loader \
+    @core kernel kernel-modulename: Build Fedora compresSO ISO
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-iso:
+    # ubuntu-latest (24.04)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Código del Repositorio
+        uses: actions/checkout@v4
+
+      - name: Asegurar Permisos de Ejecución
+        run: |
+          chmod +x scripts/mk_distro_utils.sh || true
+
+      - name: Compilar ISO en Contenedor Oficial Fedora 40 (Aislado)
+        run: |
+          # Usamos Docker con --privileged y mapeo completo de /dev para evitar fallos de cgroups v2 en Ubuntu 24.04
+          docker run --privileged \
+            --device /dev/loop-control \
+            --device /dev/loop0 \
+            -v /dev:/dev \
+            -v "$(pwd)":/workspace \
+            -w /workspace \
+            registry.fedoraproject.org/fedora:40 \
+            bash -c "
+              set -ex
+              # Instalar paquetes base necesarios para orquestar la build
+              dnf install -y dnf-plugins-core squashfs-tools xorriso grub2-tools grub2-tools-extra dosfstools util-linux
+              # Ejecutar el orquestador
+              ./scripts/mk_distro_utils.sh
+            "
+
+      - name: Subir Imagen ISO Compilada
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fedora-compresSO-Live-x86_64
+          path: out/*.iso
+          retention-days: 7s mesa-vulkan-drivers libdrm amdgpu-firmware vulkan-loader \
     enlightenment lightdm retroarch alsa-utils alsa-lib \
     firefox nautilus gnome-disk-utility btrfs-progs zram-generator squashfs-tools grub2-efi xorriso
 # 1. Configurar LightDM con auto-login a Enlightenment
