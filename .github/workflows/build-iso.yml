@@ -17,7 +17,7 @@ fi
 echo "[+] Limpiando áreas de montaje..."
 rm -rf "$BUILD_ROOT" "$ISO_DIR" "$OUTPUT_DIR"
 mkdir -p "$BUILD_ROOT" "$ISO_DIR/LiveOS" "$ISO_DIR/isolinux" "$OUTPUT_DIR"
-echo "[+] Inicializando descarga de paquetes Fedora 40 para el RootFS..."
+echo "[+] Limpiando áreas de montaje..."
 dnf install --installroot="$BUILD_ROOT" --releasever=40 \
     --setopt=install_weak_deps=False -y \
     @core kernel kernel-modulename: Build Fedora compresSO ISO
