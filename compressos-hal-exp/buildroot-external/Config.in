@@ -1,0 +1,3 @@
+menu "CompressOS-HAL experimental components"
+source "$BR2_EXTERNAL_COMPRESSO_PATH/package/compresso-memoryd/Config.in"
+endmenu
