@@ -1,66 +1,156 @@
 #!/usr/bin/env python3
-"""Experimental fail-closed ZRAM/Zswap configurator."""
-import argparse,json,re,subprocess,sys
+"""Experimental, fail-closed ZRAM/Zswap configurator for CompressOS-HAL."""
+from __future__ import annotations
+import argparse, json, os, re, subprocess, sys
 from pathlib import Path
-DEFAULTS={"PROFILE":"zram-fast","DEVICE":"/dev/zram0","ALGORITHM":"lz4","DISKSIZE_PERCENT":"50","MEM_LIMIT_PERCENT":"20","ZSWAP_PERCENT":"5","SWAP_PRIORITY":"100","FALLBACK_ALGORITHMS":"lzo-rle,lzo","ALLOW_EXISTING_SWAP":"false","BACKING_SWAP":""}
-PROFILES={"zram-fast","zswap-first","hybrid-exp"}
-class MemoryErrorSafe(RuntimeError): pass
-def validate(c):
- if c["PROFILE"] not in PROFILES: raise MemoryErrorSafe("PROFILE inválido")
- for k,lo,hi in (("DISKSIZE_PERCENT",10,100),("MEM_LIMIT_PERCENT",5,40),("ZSWAP_PERCENT",1,20),("SWAP_PRIORITY",1,32767)):
-  if not c[k].isdigit() or not lo<=int(c[k])<=hi: raise MemoryErrorSafe(k+" fuera de rango")
- if not re.fullmatch(r"/dev/zram[0-9]+",c["DEVICE"]): raise MemoryErrorSafe("DEVICE inválido")
- if c["ALLOW_EXISTING_SWAP"] not in ("true","false"): raise MemoryErrorSafe("ALLOW_EXISTING_SWAP inválido")
- if not re.fullmatch(r"[a-z0-9_-]+",c["ALGORITHM"]): raise MemoryErrorSafe("ALGORITHM inválido")
- if c["PROFILE"]=="zswap-first" and not c["BACKING_SWAP"]: raise MemoryErrorSafe("zswap-first requiere BACKING_SWAP")
- if c["PROFILE"]=="hybrid-exp" and c["BACKING_SWAP"]: raise MemoryErrorSafe("hybrid-exp usa ZRAM como backend")
+
+DEFAULTS = {
+    "PROFILE": "zram-fast", "DEVICE": "/dev/zram0", "ALGORITHM": "lz4",
+    "DISKSIZE_PERCENT": "50", "MEM_LIMIT_PERCENT": "20", "ZSWAP_PERCENT": "5",
+    "SWAP_PRIORITY": "100", "FALLBACK_ALGORITHMS": "lzo-rle,lzo",
+    "ALLOW_EXISTING_SWAP": "false", "BACKING_SWAP": "",
+}
+PROFILES = {"zram-fast", "zswap-first", "hybrid-exp"}
+
+class MemoryErrorSafe(RuntimeError):
+    pass
+
 def load_config(path):
- c=DEFAULTS.copy(); seen=set(); p=Path(path)
- if p.exists():
-  for n,line in enumerate(p.read_text().splitlines(),1):
-   line=line.strip()
-   if not line or line.startswith("#"): continue
-   if "=" not in line: raise MemoryErrorSafe(f"línea {n}: KEY=VALUE esperado")
-   k,v=(x.strip() for x in line.split("=",1))
-   if k not in c or k in seen: raise MemoryErrorSafe(f"clave desconocida o duplicada: {k}")
-   c[k]=v; seen.add(k)
- validate(c); return c
-def configure(c,sys_root="/",proc_swaps="/proc/swaps",meminfo="/proc/meminfo",dry_run=False,runner=None):
- root=Path(sys_root); sp=lambda p:root/p.lstrip("/"); swaps=Path(proc_swaps); active=swaps.read_text() if swaps.exists() else ""
- dev=c["DEVICE"]
- if dev in active: raise MemoryErrorSafe(f"{dev} ya activo; no se reinicializa")
- enabled=sp("/sys/module/zswap/parameters/enabled"); pool=sp("/sys/module/zswap/parameters/max_pool_percent")
- def cmd(args):
-  if not dry_run: (runner or (lambda a:subprocess.run(a,check=True,stdin=subprocess.DEVNULL)))(args)
- if c["PROFILE"]=="zswap-first":
-  if not enabled.exists() or not pool.exists(): raise MemoryErrorSafe("Zswap/max_pool_percent no disponible")
-  if not dry_run:
-   if not Path(c["BACKING_SWAP"]).exists(): raise MemoryErrorSafe("BACKING_SWAP no existe")
-   pool.write_text(c["ZSWAP_PERCENT"]); enabled.write_text("Y\n")
-  cmd(["swapon","--priority",c["SWAP_PRIORITY"],c["BACKING_SWAP"]])
-  return {"profile":c["PROFILE"],"zswap":"enabled","backend":c["BACKING_SWAP"]}
- z=sp("/sys/block/"+Path(dev).name); f={n:z/n for n in ("disksize","mem_limit","comp_algorithm","reset")}
- if not z.exists() or not all(p.exists() for p in f.values()): raise MemoryErrorSafe("interfaz ZRAM incompleta")
- total=None
- for line in Path(meminfo).read_text().splitlines():
-  if line.startswith("MemTotal:"): total=int(line.split()[1])*1024; break
- if total is None: raise MemoryErrorSafe("MemTotal no disponible")
- algs=f["comp_algorithm"].read_text().replace("[","").replace("]","").split()
- selected=c["ALGORITHM"] if c["ALGORITHM"] in algs else next((a for a in c["FALLBACK_ALGORITHMS"].split(",") if a in algs),None)
- if not selected: raise MemoryErrorSafe("ningún compresor disponible")
- dsize=total*int(c["DISKSIZE_PERCENT"])//100; limit=total*int(c["MEM_LIMIT_PERCENT"])//100
- if c["PROFILE"]=="hybrid-exp" and (not enabled.exists() or not pool.exists()): raise MemoryErrorSafe("Zswap no disponible; híbrido cancelado")
- if not dry_run:
-  f["reset"].write_text("1\n"); f["comp_algorithm"].write_text(selected); f["mem_limit"].write_text(str(limit)); f["disksize"].write_text(str(dsize))
-  if c["PROFILE"]=="hybrid-exp": pool.write_text(c["ZSWAP_PERCENT"]); enabled.write_text("Y\n")
-  elif enabled.exists(): enabled.write_text("N\n")
- cmd(["mkswap",dev]); cmd(["swapon","--priority",c["SWAP_PRIORITY"],dev])
- return {"profile":c["PROFILE"],"algorithm":selected,"disksize_bytes":dsize,"mem_limit_bytes":limit,"zswap":"enabled" if c["PROFILE"]=="hybrid-exp" else "disabled"}
+    cfg = DEFAULTS.copy()
+    p = Path(path)
+    if not p.exists():
+        validate_config(cfg)
+        return cfg
+    seen_keys = set()
+    for no, raw in enumerate(p.read_text().splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            raise MemoryErrorSafe(f"línea {no}: se esperaba KEY=VALUE")
+        key, value = (part.strip() for part in line.split("=", 1))
+        if not re.fullmatch(r"^[A-Z][A-Z0-9_]*$", key) or key not in cfg:
+            raise MemoryErrorSafe(f"clave desconocida/inválida: {key}")
+        if key in seen_keys:
+            raise MemoryErrorSafe(f"clave duplicada: {key}")
+        cfg[key] = value
+        seen_keys.add(key)
+    validate_config(cfg)
+    return cfg
+
+def validate_config(c):
+    if c["PROFILE"] not in PROFILES:
+        raise MemoryErrorSafe("PROFILE debe ser zram-fast, zswap-first o hybrid-exp")
+    for k, lo, hi in (("DISKSIZE_PERCENT", 10, 100), ("MEM_LIMIT_PERCENT", 5, 40), ("ZSWAP_PERCENT", 1, 20), ("SWAP_PRIORITY", 1, 32767)):
+        if not c[k].isdigit() or not lo <= int(c[k]) <= hi:
+            raise MemoryErrorSafe(f"{k} fuera de rango [{lo}, {hi}]")
+    if not re.fullmatch(r"/dev/zram[0-9]+", c["DEVICE"]):
+        raise MemoryErrorSafe("DEVICE debe ser un dispositivo /dev/zramN")
+    if c["ALLOW_EXISTING_SWAP"] not in ("true", "false"):
+        raise MemoryErrorSafe("ALLOW_EXISTING_SWAP debe ser true o false")
+    if not re.fullmatch(r"[a-z0-9_-]+", c["ALGORITHM"]):
+        raise MemoryErrorSafe("ALGORITHM inválido")
+    if c["PROFILE"] == "zswap-first" and not c["BACKING_SWAP"]:
+        raise MemoryErrorSafe("zswap-first requiere BACKING_SWAP explícito")
+    if c["PROFILE"] == "hybrid-exp" and c["BACKING_SWAP"]:
+        raise MemoryErrorSafe("hybrid-exp usa ZRAM como backend; BACKING_SWAP debe quedar vacío")
+
+def configure(cfg, *, sys_root="/", proc_swaps="/proc/swaps", meminfo="/proc/meminfo", dry_run=False, runner=None):
+    profile = cfg["PROFILE"]
+    root = Path(sys_root)
+    def sp(p):
+        return root / p.lstrip("/")
+    swaps = Path(proc_swaps)
+    active = swaps.read_text() if swaps.exists() else ""
+    zdev = cfg["DEVICE"]
+    if zdev in active:
+        raise MemoryErrorSafe(f"{zdev} ya aparece activo; no se reinicializa ni se ejecuta swapoff")
+
+    enabled = sp("/sys/module/zswap/parameters/enabled")
+    pool = sp("/sys/module/zswap/parameters/max_pool_percent")
+
+    def run_cmd(argv):
+        if not dry_run:
+            if runner:
+                runner(argv)
+            else:
+                subprocess.run(argv, check=True, stdin=subprocess.DEVNULL)
+
+    if profile == "zswap-first":
+        if not enabled.exists() or not pool.exists():
+            raise MemoryErrorSafe("Zswap o max_pool_percent no disponible")
+        if not dry_run:
+            if not Path(cfg["BACKING_SWAP"]).exists():
+                raise MemoryErrorSafe("BACKING_SWAP no existe")
+            pool.write_text(cfg["ZSWAP_PERCENT"])
+            enabled.write_text("Y\n")
+        run_cmd(["swapon", "--priority", cfg["SWAP_PRIORITY"], cfg["BACKING_SWAP"]])
+        return {"profile": profile, "zswap": "enabled", "zswap_pool_percent": int(cfg["ZSWAP_PERCENT"]), "backend": cfg["BACKING_SWAP"]}
+
+    devname = Path(zdev).name
+    zbase = sp(f"/sys/block/{devname}")
+    if not zbase.exists():
+        raise MemoryErrorSafe(f"{zdev} no existe; cargue/active el módulo zram primero")
+    files = {name: zbase / name for name in ("disksize", "mem_limit", "comp_algorithm", "reset")}
+    if not all(path.exists() for path in files.values()):
+        raise MemoryErrorSafe("interfaz sysfs ZRAM incompleta")
+
+    total_kb = None
+    for line in Path(meminfo).read_text().splitlines():
+        if line.startswith("MemTotal:"):
+            total_kb = int(line.split()[1])
+            break
+    if total_kb is None:
+        raise MemoryErrorSafe("no se pudo leer MemTotal")
+    total_bytes = total_kb * 1024
+    disksize = total_bytes * int(cfg["DISKSIZE_PERCENT"]) // 100
+    mem_limit = total_bytes * int(cfg["MEM_LIMIT_PERCENT"]) // 100
+
+    algorithms = files["comp_algorithm"].read_text().replace("[", "").replace("]", "").split()
+    selected = cfg["ALGORITHM"] if cfg["ALGORITHM"] in algorithms else None
+    if not selected:
+        for candidate in cfg["FALLBACK_ALGORITHMS"].split(","):
+            if candidate in algorithms:
+                selected = candidate
+                break
+    if not selected:
+        raise MemoryErrorSafe("ningún algoritmo solicitado/fallback está disponible")
+
+    if profile == "hybrid-exp" and (not enabled.exists() or not pool.exists()):
+        raise MemoryErrorSafe("Zswap o max_pool_percent no disponible; híbrido cancelado")
+
+    if not dry_run:
+        files["reset"].write_text("1\n")
+        files["comp_algorithm"].write_text(selected)
+        if files["mem_limit"].exists():
+            files["mem_limit"].write_text(str(mem_limit))
+        files["disksize"].write_text(str(disksize))
+        if profile == "hybrid-exp":
+            pool.write_text(cfg["ZSWAP_PERCENT"])
+            enabled.write_text("Y\n")
+        elif profile == "zram-fast" and enabled.exists():
+            enabled.write_text("N\n")
+
+    run_cmd(["mkswap", zdev])
+    run_cmd(["swapon", "--priority", cfg["SWAP_PRIORITY"], zdev])
+    return {"profile": profile, "zram_device": zdev, "algorithm": selected, "disksize_bytes": disksize, "mem_limit_bytes": mem_limit, "zswap": "enabled" if profile == "hybrid-exp" else ("disabled" if profile == "zram-fast" else "not-applicable")}
+
 def main(argv=None):
- p=argparse.ArgumentParser(); p.add_argument("--config",default="/etc/compresso/memory.conf"); p.add_argument("--dry-run",action="store_true"); p.add_argument("--status",action="store_true"); a=p.parse_args(argv)
- try:
-  c=load_config(a.config)
-  if a.status: print(json.dumps({"zram":Path("/sys/block/zram0").exists(),"zswap":Path("/sys/module/zswap/parameters/enabled").exists(),"profile":c["PROFILE"]},indent=2)); return 0
-  print(json.dumps(configure(c,dry_run=a.dry_run),indent=2)); return 0
- except (MemoryErrorSafe,OSError,subprocess.CalledProcessError) as e: print("compresso-memoryd: ERROR:",e,file=sys.stderr); return 4
-if __name__=="__main__": raise SystemExit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default="/etc/compresso/memory.conf")
+    parser.add_argument("--dry-run", action="store_true", help="validar y mostrar el plan sin modificar sysfs ni activar swap")
+    parser.add_argument("--status", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        cfg = load_config(args.config)
+        if args.status:
+            print(json.dumps({"zram": Path("/sys/block/zram0").exists(), "zswap": Path("/sys/module/zswap/parameters/enabled").exists(), "profile": cfg["PROFILE"]}, indent=2))
+            return 0
+        print(json.dumps(configure(cfg, dry_run=args.dry_run), indent=2))
+        return 0
+    except (MemoryErrorSafe, OSError, subprocess.CalledProcessError) as exc:
+        print(f"compresso-memoryd: ERROR: {exc}", file=sys.stderr)
+        return 4
+
+if __name__ == "__main__":
+    raise SystemExit(main())
