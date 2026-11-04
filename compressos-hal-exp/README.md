@@ -68,6 +68,21 @@ sudo cat /run/compresso/metrics.json
 
 The collector reads `/proc` and `/sys` only. Missing kernel interfaces are represented as null or omitted fields; they are not treated as fatal.
 
+## Read-only supervisor and control CLI
+
+After installing the package, `compressoctl` provides read-only inspection commands:
+
+```bash
+compressoctl status
+compressoctl doctor
+compressoctl metrics
+compressoctl benchmark --profile zram-fast --memory-mib 32 --output /var/tmp/zram-fast.json
+```
+
+The supervisor compares the configured profile with active swap devices and observed ZRAM/Zswap kernel state. Exit codes: 0 healthy, 1 warning, 2 critical/error. The `compresso-supervisord.service` health check uses this inspector and does not repair or mutate system state.
+
+There are deliberately no `enable`, `disable`, `swapoff` or profile-switch commands in this CLI. Profile changes remain a manual configuration/reboot operation until a separate, guarded live-transition design has been validated. Do not run multiple ZRAM managers simultaneously.
+
 ## Bounded profile benchmark
 
 The benchmark runs five identical, short memory-allocation samples and records elapsed time, child-process page faults, swap I/O counter deltas and memory PSI total deltas. It does not activate, deactivate or switch profiles. Set the desired profile in `/etc/compresso/memory.conf`, reboot, verify the active profile and swap layout, then run one report per profile. Use the same workload size for comparable trials.
