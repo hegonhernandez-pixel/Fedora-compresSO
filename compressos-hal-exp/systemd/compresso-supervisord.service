@@ -1,0 +1,13 @@
+[Unit]
+Description=CompressOS-HAL experimental service health check
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/compresso/healthcheck.sh
+User=root
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+[Install]
+WantedBy=multi-user.target
