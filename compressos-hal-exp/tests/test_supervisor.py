@@ -1,4 +1,8 @@
+import os
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 
 from compresso.supervisor import inspect_health
 
@@ -13,6 +17,17 @@ def snapshot(active, zram_devices=("zram0",), zswap_enabled="N"):
 
 
 class SupervisorTests(unittest.TestCase):
+    def test_installed_style_supervisor_script_has_standalone_help(self):
+        script = Path(__file__).resolve().parents[1] / "src" / "compresso" / "supervisor.py"
+        env = os.environ.copy()
+        env.pop("PYTHONPATH", None)
+        completed = subprocess.run(
+            [sys.executable, str(script), "--help"],
+            capture_output=True, text=True, env=env, timeout=10,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("--config", completed.stdout)
+
     def test_zram_fast_is_healthy_when_configured_device_is_active_and_zswap_off(self):
         report = inspect_health({"PROFILE": "zram-fast", "DEVICE": "/dev/zram0"},
                                  snapshot(["/dev/zram0"]))
