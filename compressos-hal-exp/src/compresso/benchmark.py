@@ -53,8 +53,8 @@ def validate_options(profile, memory_mib, hold_seconds):
 
 
 def safe_memory_mib(requested_mib, mem_available_kb):
-    if isinstance(requested_mib, bool) or not isinstance(requested_mib, int) or not 1 <= requested_mib <= MAX_MEMORY_MIB:
-        raise ValueError(f"requested workload must be between 1 and {MAX_MEMORY_MIB} MiB")
+    if isinstance(requested_mib, bool) or not isinstance(requested_mib, int) or requested_mib < 1:
+        raise ValueError("requested workload must be a positive integer")
     if isinstance(mem_available_kb, bool) or not isinstance(mem_available_kb, int) or mem_available_kb <= 0:
         raise ValueError("MemAvailable is missing or invalid; refusing to start workload")
     ten_percent_available = mem_available_kb // 1024 // 10
