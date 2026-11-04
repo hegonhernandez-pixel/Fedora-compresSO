@@ -1,0 +1,5 @@
+config BR2_PACKAGE_COMPRESSO_MEMORYD
+ bool "compresso-memoryd"
+ depends on BR2_PACKAGE_PYTHON3
+ help
+   Experimental ZRAM/Zswap configurator; disabled by default.

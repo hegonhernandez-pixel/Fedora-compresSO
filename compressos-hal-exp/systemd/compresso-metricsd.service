@@ -1,0 +1,14 @@
+[Unit]
+Description=CompressOS-HAL read-only JSON memory metrics snapshot
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/libexec/compresso/metrics.py --output /run/compresso/metrics.json
+User=root
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/run/compresso
+[Install]
+WantedBy=multi-user.target
