@@ -85,7 +85,7 @@ class RuntimeTests(unittest.TestCase):
             cfg = {"PROFILE":"zswap-first","DEVICE":"/dev/zram0","ALGORITHM":"lz4","DISKSIZE_PERCENT":"50","MEM_LIMIT_PERCENT":"20","ZSWAP_PERCENT":"7","SWAP_PRIORITY":"80","FALLBACK_ALGORITHMS":"lzo-rle,lzo","ALLOW_EXISTING_SWAP":"false","BACKING_SWAP":str(backing)}
             calls = []
             result = configure(cfg, sys_root=d, proc_swaps=str(swaps), runner=lambda a: calls.append(a))
-            self.assertEqual((zswap/"enabled").read_text(), "Y\\n")
+            self.assertEqual((zswap/"enabled").read_text(), "Y\n")
             self.assertEqual((zswap/"max_pool_percent").read_text(), "7")
             self.assertEqual(calls, [["swapon", "--priority", "80", str(backing)]])
             self.assertEqual(result["zswap"], "enabled")
@@ -107,7 +107,7 @@ class RuntimeTests(unittest.TestCase):
             result = configure(cfg, sys_root=d, proc_swaps=str(swaps), meminfo=str(mem), runner=lambda a: calls.append(a))
             self.assertEqual((z/"comp_algorithm").read_text(), "lz4")
             self.assertNotEqual((z/"disksize").read_text(), "0")
-            self.assertEqual((zswap/"enabled").read_text(), "Y\\n")
+            self.assertEqual((zswap/"enabled").read_text(), "Y\n")
             self.assertEqual((zswap/"max_pool_percent").read_text(), "7")
             self.assertEqual(calls, [["mkswap", "/dev/zram0"], ["swapon", "--priority", "90", "/dev/zram0"]])
             self.assertEqual(result["zswap"], "enabled")
@@ -130,15 +130,15 @@ class RuntimeTests(unittest.TestCase):
             z = self.make_fake_tree(d)
             zswap = root / "sys/module/zswap/parameters"
             zswap.mkdir(parents=True)
-            (zswap/"enabled").write_text("Y\\n")
-            (zswap/"max_pool_percent").write_text("20\\n")
+            (zswap/"enabled").write_text("Y\n")
+            (zswap/"max_pool_percent").write_text("20\n")
             mem = root / "meminfo"
-            mem.write_text("MemTotal: 4096000 kB\\n")
+            mem.write_text("MemTotal: 4096000 kB\n")
             swaps = root / "swaps"
-            swaps.write_text("Filename Type Size Used Priority\\n")
+            swaps.write_text("Filename Type Size Used Priority\n")
             cfg = {"PROFILE":"zram-fast","DEVICE":"/dev/zram0","ALGORITHM":"lz4","DISKSIZE_PERCENT":"50","MEM_LIMIT_PERCENT":"20","ZSWAP_PERCENT":"5","SWAP_PRIORITY":"100","FALLBACK_ALGORITHMS":"lzo-rle,lzo","ALLOW_EXISTING_SWAP":"false","BACKING_SWAP":""}
             configure(cfg, sys_root=d, proc_swaps=str(swaps), meminfo=str(mem), runner=lambda a: None)
-            self.assertEqual((zswap/"enabled").read_text(), "N\\n")
+            self.assertEqual((zswap/"enabled").read_text(), "N\n")
 
 
     def test_zswap_first_does_not_reactivate_backend_already_in_proc_swaps(self):
@@ -146,12 +146,12 @@ class RuntimeTests(unittest.TestCase):
             root = Path(d)
             zswap = root / "sys/module/zswap/parameters"
             zswap.mkdir(parents=True)
-            (zswap/"enabled").write_text("N\\n")
-            (zswap/"max_pool_percent").write_text("20\\n")
+            (zswap/"enabled").write_text("N\n")
+            (zswap/"max_pool_percent").write_text("20\n")
             backing = root / "swapfile"
             backing.write_text("")
             swaps = root / "swaps"
-            swaps.write_text("Filename Type Size Used Priority\\n" + str(backing) + " file 1024 0 -2\\n")
+            swaps.write_text("Filename Type Size Used Priority\n" + str(backing) + " file 1024 0 -2\n")
             cfg = {"PROFILE":"zswap-first","DEVICE":"/dev/zram0","ALGORITHM":"lz4","DISKSIZE_PERCENT":"50","MEM_LIMIT_PERCENT":"20","ZSWAP_PERCENT":"7","SWAP_PRIORITY":"80","FALLBACK_ALGORITHMS":"lzo-rle,lzo","ALLOW_EXISTING_SWAP":"false","BACKING_SWAP":str(backing)}
             calls = []
             configure(cfg, sys_root=d, proc_swaps=str(swaps), runner=lambda a: calls.append(a))
