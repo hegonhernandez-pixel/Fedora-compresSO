@@ -14,7 +14,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from compresso.metrics import collect_metrics
+try:
+    from .metrics import collect_metrics
+except ImportError:  # Running as an installed standalone script.
+    from metrics import collect_metrics
 
 
 PROFILES = ("zram-fast", "zswap-first", "hybrid-exp")
