@@ -55,15 +55,26 @@ def validate_config(c):
     if c["PROFILE"] == "hybrid-exp" and c["BACKING_SWAP"]:
         raise MemoryErrorSafe("hybrid-exp usa ZRAM como backend; BACKING_SWAP debe quedar vacío")
 
+def _active_swap_paths(text):
+    """Return active swap paths from /proc/swaps, ignoring its header."""
+    paths = set()
+    for line in text.splitlines()[1:]:
+        fields = line.split()
+        if fields:
+            paths.add(fields[0])
+    return paths
+
+
 def configure(cfg, *, sys_root="/", proc_swaps="/proc/swaps", meminfo="/proc/meminfo", dry_run=False, runner=None):
     profile = cfg["PROFILE"]
     root = Path(sys_root)
     def sp(p):
         return root / p.lstrip("/")
     swaps = Path(proc_swaps)
-    active = swaps.read_text() if swaps.exists() else ""
+    active_text = swaps.read_text() if swaps.exists() else ""
+    active_paths = _active_swap_paths(active_text)
     zdev = cfg["DEVICE"]
-    if zdev in active:
+    if zdev in active_paths:
         raise MemoryErrorSafe(f"{zdev} ya aparece activo; no se reinicializa ni se ejecuta swapoff")
 
     enabled = sp("/sys/module/zswap/parameters/enabled")
@@ -84,7 +95,8 @@ def configure(cfg, *, sys_root="/", proc_swaps="/proc/swaps", meminfo="/proc/mem
                 raise MemoryErrorSafe("BACKING_SWAP no existe")
             pool.write_text(cfg["ZSWAP_PERCENT"])
             enabled.write_text("Y\n")
-        run_cmd(["swapon", "--priority", cfg["SWAP_PRIORITY"], cfg["BACKING_SWAP"]])
+        if cfg["BACKING_SWAP"] not in active_paths:
+            run_cmd(["swapon", "--priority", cfg["SWAP_PRIORITY"], cfg["BACKING_SWAP"]])
         return {"profile": profile, "zswap": "enabled", "zswap_pool_percent": int(cfg["ZSWAP_PERCENT"]), "backend": cfg["BACKING_SWAP"]}
 
     devname = Path(zdev).name
