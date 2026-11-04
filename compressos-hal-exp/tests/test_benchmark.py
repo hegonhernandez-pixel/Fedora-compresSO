@@ -19,7 +19,8 @@ class BenchmarkTests(unittest.TestCase):
             validate_options("zram-fast", 32, 31)
 
     def test_workload_is_capped_by_requested_size_available_ram_and_hard_limit(self):
-        self.assertEqual(safe_memory_mib(256, 1024 * 1024), 128)
+        self.assertEqual(safe_memory_mib(256, 4 * 1024 * 1024), 128)
+        self.assertEqual(safe_memory_mib(256, 1024 * 1024), 102)
         self.assertEqual(safe_memory_mib(64, 200 * 1024), 20)
         with self.assertRaises(ValueError):
             safe_memory_mib(32, 512)
