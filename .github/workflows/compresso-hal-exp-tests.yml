@@ -1,4 +1,4 @@
-name: CompressOS-HAL EXP tests (unit, telemetry and shell checks)
+name: CompressOS-HAL EXP tests (unit, telemetry, and shell checks)
 
 on:
   push:
