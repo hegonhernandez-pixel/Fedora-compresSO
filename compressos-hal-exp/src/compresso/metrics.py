@@ -26,7 +26,7 @@ def _key_values(path):
         fields = line.split()
         if len(fields) >= 2:
             try:
-                values[fields[0]] = int(fields[1])
+                values[fields[0].rstrip(\":\")] = int(fields[1])
             except ValueError:
                 continue
     return values
