@@ -30,4 +30,4 @@ jobs:
       - name: Compile Python
         run: python -m compileall -q src tests
       - name: Check shell syntax
-        run: bash -n scripts/*.sh
+        run: bash -n scripts/*.sh scripts/compressoctl
