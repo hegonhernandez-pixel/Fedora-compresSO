@@ -68,5 +68,16 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(loaded["vmstat"]["pgmajfault"], 56)
 
 
+    def test_meminfo_field_names_are_normalized(self):
+        with tempfile.TemporaryDirectory() as d:
+            proc = Path(d) / "proc"
+            proc.mkdir()
+            (proc / "meminfo").write_text("MemTotal: 2048 kB\\nMemAvailable: 1024 kB\\n")
+            (proc / "vmstat").write_text("")
+            (proc / "swaps").write_text("Filename Type Size Used Priority\\n")
+            data = collect_metrics(proc_root=proc, sys_root=Path(d) / "sys", timestamp="fixed")
+        self.assertEqual(data["memory_kb"], {"MemTotal": 2048, "MemAvailable": 1024})
+
+
 if __name__ == "__main__":
     unittest.main()
