@@ -1,9 +1,9 @@
 [Unit]
-Description=CompressOS-HAL read-only memory metrics snapshot
+Description=CompressOS-HAL read-only JSON memory metrics snapshot
 After=multi-user.target
 [Service]
 Type=oneshot
-ExecStart=/usr/libexec/compresso/metrics.sh
+ExecStart=/usr/bin/python3 /usr/libexec/compresso/metrics.py --output /run/compresso/metrics.json
 User=root
 NoNewPrivileges=yes
 ProtectSystem=strict
