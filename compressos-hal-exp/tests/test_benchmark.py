@@ -27,7 +27,7 @@ class BenchmarkTests(unittest.TestCase):
     def test_counter_deltas_ignore_missing_and_reset_counters(self):
         self.assertEqual(
             counter_deltas({"pswpin": 10, "pgfault": 20}, {"pswpin": 15, "pgfault": 3}),
-            {"pswpin": 5, "pgfault": None},
+            {"pswpin": 5, "pswpout": None, "pgfault": None, "pgmajfault": None},
         )
 
     def test_psi_total_deltas_are_reported_in_microseconds(self):
