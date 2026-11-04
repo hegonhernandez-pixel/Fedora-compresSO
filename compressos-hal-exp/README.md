@@ -68,6 +68,18 @@ sudo cat /run/compresso/metrics.json
 
 The collector reads `/proc` and `/sys` only. Missing kernel interfaces are represented as null or omitted fields; they are not treated as fatal.
 
+## Bounded profile benchmark
+
+The benchmark runs five identical, short memory-allocation samples and records elapsed time, child-process page faults, swap I/O counter deltas and memory PSI total deltas. It does not activate, deactivate or switch profiles. Set the desired profile in `/etc/compresso/memory.conf`, reboot, verify the active profile and swap layout, then run one report per profile. Use the same workload size for comparable trials.
+
+The workload is capped at 128 MiB and at 10% of currently available memory (whichever is smaller); it refuses to run if `MemAvailable` is missing or too low. It is a controlled allocation/page-touch test, not a claim of gaming or application performance.
+
+```bash
+sudo python3 /usr/libexec/compresso/benchmark.py --profile zram-fast --memory-mib 32 --output /var/tmp/compresso-zram-fast.json
+```
+
+Repeat after manually configuring and rebooting into `zswap-first` and `hybrid-exp`, using the corresponding `--profile` label and a separate output filename. Do not change profiles while the machine is under load. Compare the five samples and the telemetry deltas; do not infer a performance winner from a single run.
+
 ## Check status and diagnostics
 
 ```bash
