@@ -1,4 +1,8 @@
+import os
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 
 from compresso.benchmark import (
     counter_deltas,
@@ -35,6 +39,17 @@ class BenchmarkTests(unittest.TestCase):
         before = {"some": {"total": "100"}, "full": {"total": "10"}}
         after = {"some": {"total": "350"}, "full": {"total": "10"}}
         self.assertEqual(psi_total_deltas(before, after), {"some": 250, "full": 0})
+
+    def test_installed_style_script_imports_sibling_metrics_without_pythonpath(self):
+        script = Path(__file__).resolve().parents[1] / "src" / "compresso" / "benchmark.py"
+        env = os.environ.copy()
+        env.pop("PYTHONPATH", None)
+        completed = subprocess.run(
+            [sys.executable, str(script), "--help"],
+            capture_output=True, text=True, env=env, timeout=10,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("--profile", completed.stdout)
 
     def test_benchmark_runs_five_samples_without_changing_profile_or_swap(self):
         snapshot = {
