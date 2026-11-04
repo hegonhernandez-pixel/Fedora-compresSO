@@ -5,6 +5,7 @@ from compresso.supervisor import inspect_health
 
 def snapshot(active, zram_devices=("zram0",), zswap_enabled="N"):
     return {
+        "memory_kb": {"MemTotal": 4096, "MemAvailable": 2048},
         "active_swaps": [{"filename": item} for item in active],
         "zram": {name: {"disksize_bytes": 1024} for name in zram_devices},
         "zswap": {"enabled": zswap_enabled},
