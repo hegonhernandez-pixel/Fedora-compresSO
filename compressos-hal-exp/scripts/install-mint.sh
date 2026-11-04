@@ -9,6 +9,7 @@ apt-get install -y python3 systemd util-linux
 install -d -m 0755 /usr/libexec/compresso /etc/compresso /usr/share/doc/compresso-hal /etc/modules-load.d
 install -m 0755 "$ROOT/src/compresso/memoryd.py" /usr/libexec/compresso/memoryd.py
 install -m 0644 "$ROOT/src/compresso/metrics.py" /usr/libexec/compresso/metrics.py
+install -m 0755 "$ROOT/src/compresso/benchmark.py" /usr/libexec/compresso/benchmark.py
 install -m 0644 "$ROOT/config/memory.conf" /etc/compresso/memory.conf
 printf 'zram\n' > /etc/modules-load.d/compresso-zram.conf
 install -m 0755 "$ROOT/scripts/metrics.sh" /usr/libexec/compresso/metrics.sh
