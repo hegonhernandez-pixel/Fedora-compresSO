@@ -1,6 +1,6 @@
 # CompressOS-HAL EXP
 
-Experimental Linux Mint XFCE integration for ZRAM, Zswap and hybrid profiles. This package does **not** build or remaster a Linux Mint ISO. Install official Linux Mint XFCE first, then install this package on that system. Buildroot is an auxiliary packaging path for standalone components, not a Mint ISO builder.
+Experimental Linux Mint XFCE integration for ZRAM, Zswap and hybrid profiles. Target platform: Linux Mint 22.3 XFCE (Ubuntu 24.04 base); compatibility must still be confirmed on a real Mint 22.3 installation. This package does **not** build or remaster a Linux Mint ISO. Install official Linux Mint XFCE first, then install this package on that system. Buildroot is an auxiliary packaging path for standalone components, not a Mint ISO builder.
 
 ## Safety status
 
